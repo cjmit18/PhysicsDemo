@@ -8,9 +8,11 @@ class Entity{
     
     private:
     std::string name;
-    double x_pos;
-    double y_pos;
-    double radius;
+    double x_pos{0.0};
+    double y_pos{0.0};
+    double radius{0.0};
+    double vx{0.0};
+    double vy{0.0};
     
     public:
     Entity() = default;
@@ -24,8 +26,15 @@ class Entity{
     void set_y(double y);
     double get_radius() const;
     void set_radius(double r);
-    double checkInput();
-    int checkBounds();
+    double get_vx() const;
+    double get_vy() const;
+    void set_vx(double vx);
+    void set_vy(double vy);
+    void checkInput();
+    void checkBounds(int WIDTH, int HEIGHT);
+    void GravityEffect(int width, int height, double GRAVITY);
+    void setVelocity(double vx, double vy);
+    void objectMovement(int WIDTH, int HEIGHT, double GRAVITY);
 
 };
 #endif // Entity_H
