@@ -6,7 +6,7 @@
 #define FALLSPEED 0.5
 #define FLYSPEED -2.0
 
-Entity::Entity(const std::string &name, double x, double y, double r): name(name), x_pos(x), y_pos(y), radius(r) {}
+Entity::Entity(const std::string &name, double x, double y, double z, double r, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), color(c) {}
 
 std::string Entity::get_name() const {
         return name;
@@ -49,12 +49,26 @@ double Entity::get_vx() const {
 double Entity::get_vy() const {
     return vy;
 }
+
+void Entity::set_color(Color color) {
+    this->color = color;
+}
+Color Entity::get_color() const {
+    return color;
+}
 void Entity::objectMovement(int WIDTH, int HEIGHT, double GRAVITY) {
     this->checkInput();
     this->GravityEffect(WIDTH, HEIGHT, GRAVITY);
     this->checkBounds(WIDTH, HEIGHT);
 }
 
+void Entity::setColliding(bool status) {
+    isColliding = status;
+}
+
+bool Entity::getCollided() const {
+    return isColliding;
+}
 void Entity::checkInput(){
     if (IsKeyDown(KEY_RIGHT)) {
         this->set_x(this->get_x() + WALK_SPEED);
@@ -79,6 +93,9 @@ void Entity::checkInput(){
         if (this->get_radius() < 100.0) {
             this->set_radius(100.0);
         }
+    }
+    if (getCollided()) {
+        this->set_color(BLUE);
     }
 }
 void Entity::checkBounds(int WIDTH, int HEIGHT){

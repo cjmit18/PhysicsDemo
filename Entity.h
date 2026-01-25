@@ -10,13 +10,16 @@ class Entity{
     std::string name;
     double x_pos{0.0};
     double y_pos{0.0};
+    double z_pos{0.0};
     double radius{0.0};
     double vx{0.0};
     double vy{0.0};
+    Color color{GREEN};
+    bool isColliding{false}; 
     
     public:
     Entity() = default;
-    Entity(const std::string &name, double x, double y, double r);
+    Entity(const std::string &name, double x, double y, double z, double r, Color c);
 
     std::string get_name() const;
     void set_name(const std::string &new_name);
@@ -30,11 +33,16 @@ class Entity{
     double get_vy() const;
     void set_vx(double vx);
     void set_vy(double vy);
+    void set_color(Color color);
+    Color get_color() const;
     void checkInput();
     void checkBounds(int WIDTH, int HEIGHT);
     void GravityEffect(int width, int height, double GRAVITY);
     void setVelocity(double vx, double vy);
     void objectMovement(int WIDTH, int HEIGHT, double GRAVITY);
+    bool getCollided() const;
+    void setColliding(bool status);
+    
 
 };
 #endif // Entity_H
