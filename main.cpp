@@ -1,39 +1,30 @@
 #include "raylib.h"
+#include "Entity.h"
+
 double x = 400;
 double y = 400;
 double rad = 100;
+Entity *players[5];
+Entity player = Entity("Player1", x, y, rad);
+void checkInput(Entity *ent) {
+    ent->checkInput();
+}
+void checkBounds(Entity *ent) {
+  ent->checkBounds();
+}
 int main() {
-  const int screenWidth = 800;
+  const int screenWidth = 900;
   const int screenHeight = 600;
   InitWindow(screenWidth, screenHeight, "raylib basic window");
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
-   SetTargetFPS(144);
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    DrawCircle(x, y, rad, RED);
-
-    if (IsKeyDown(KEY_RIGHT)){
-      x += 1;
-    }
-    if (IsKeyDown(KEY_LEFT)){
-      x-= 1;
-    }
-
-    if (IsKeyDown(KEY_UP)){
-      y -= 1;
-    }
-    if (IsKeyDown(KEY_DOWN)){
-      y+=1;
-    }
-    if (IsKeyPressed(KEY_MINUS)){
-      rad -= 10;
-    }
-    if (IsKeyPressed(KEY_EQUAL)){
-      rad += 10;
-    }
-    
+    DrawCircle(player.get_x(), player.get_y(), player.get_radius(), RED);
+    checkInput(&player);
+    checkBounds(&player);
     EndDrawing();
+
   }
   CloseWindow();
   return 0;

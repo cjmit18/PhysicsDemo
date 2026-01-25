@@ -1,2 +1,0 @@
-gcc -o raylibhelloworld.exe raylibhelloworld.c  -I include -L lib -lraylib -lgdi32 -lwinmm
-gcc -o raylibhelloworld.exe main.cpp  -I include -L lib -lraylib -lgdi32 -lwinmm
