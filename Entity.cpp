@@ -11,6 +11,8 @@ Entity::Entity(const std::string &name, double x, double y, double z, double r, 
 std::string Entity::get_name() const {
         return name;
     }
+
+
 void Entity::set_name(const std::string &new_name) {
     name = new_name;
     }
@@ -56,9 +58,9 @@ void Entity::set_color(Color color) {
 Color Entity::get_color() const {
     return color;
 }
-void Entity::objectMovement(int WIDTH, int HEIGHT, double GRAVITY) {
-    this->checkInput();
-    this->GravityEffect(WIDTH, HEIGHT, GRAVITY);
+void Entity::objectMovement(int WIDTH, int HEIGHT, double gravity) {
+    this->checkInput(gravity);
+    this->GravityEffect(WIDTH, HEIGHT, gravity);
     this->checkBounds(WIDTH, HEIGHT);
 }
 
@@ -69,19 +71,33 @@ void Entity::setColliding(bool status) {
 bool Entity::getCollided() const {
     return isColliding;
 }
-void Entity::checkInput(){
-    if (IsKeyDown(KEY_RIGHT)) {
-        this->set_x(this->get_x() + WALK_SPEED);
+bool Entity::isMarkedForDeletion() const {
+    return markedForDeletion;
+}
+void Entity::markedForDeletionStatus(bool status) {
+    markedForDeletion = status;
+}
+void Entity::checkInput(double gravity){
+    // Horizontal: control velocity, don't modify position directly
+    if (IsKeyDown(KEY_D)) {
+        this->set_vx(WALK_SPEED);
+    } 
+    else if (IsKeyDown(KEY_A)) {
+        this->set_vx(-WALK_SPEED);
+    } 
+    else {
+        // simple damping when no horizontal input
+        this->set_vx(this->get_vx() * 0.8);
+        if (std::abs(this->get_vx()) < 0.1) this->set_vx(0.0);
     }
-    if (IsKeyDown(KEY_LEFT)) {
-        this->set_x(this->get_x() - WALK_SPEED);
-    }
-    if (IsKeyDown(KEY_UP)) {
+    // Vertical: treat as velocity impulses instead of position edits
+    if (IsKeyDown(KEY_W)) {
         this->set_vy(FLYSPEED);
     }
-    if (IsKeyDown(KEY_DOWN)) {
+    if (IsKeyDown(KEY_S)) {
         this->set_vy(FALLSPEED);
     }
+
     if (IsKeyDown(KEY_EQUAL)) {
         this->set_radius(this->get_radius() + 1.0);
         if (this->get_radius() > 150.0) {
@@ -94,38 +110,69 @@ void Entity::checkInput(){
             this->set_radius(100.0);
         }
     }
-    if (getCollided()) {
-        this->set_color(BLUE);
+    if (IsKeyDown(KEY_DELETE)) {
+        this->markedForDeletionStatus(true);
+        }
     }
-}
 void Entity::checkBounds(int WIDTH, int HEIGHT){
     double maxRadius = std::min(WIDTH/2.0 , HEIGHT/2.0);
     if (this->get_radius() > maxRadius) {
         this->set_radius(maxRadius);
+        this->isColliding = true;
     }
     if (this->get_x() - this->get_radius() < 0) { // Left bound
         this->set_x(this->get_radius());
+        this->isColliding = true;
     }
     if (this->get_x() + this->get_radius() > WIDTH) { // Right bound
         this->set_x(WIDTH - this->get_radius());
+        this->isColliding = true;
     }
     if (this->get_y() - this->get_radius() < 0) { // Top bound
         this->set_y(this->get_radius());
+        this->set_vy(0.0); // stop upward movement
+        this->isAtCeiling = true;
+        this->isColliding = true;
+        this->isStatic = false;
     }
     if (this->get_y() + this->get_radius() > HEIGHT) { // Bottom bound
         this->set_y(HEIGHT - this->get_radius());
+        // if still moving vertically consider it a collision, otherwise treat as resting
+        if (std::abs(this->get_vy()) > 1e-3) {
+            this->isColliding = true;
+            this->isOnGround = false;
+            this->isStatic = false;
+        }
+        else {
+            this->isOnGround = true;
+            this->isStatic = true;
+        }
     }
-    
+    if (getCollided()) {
+        this->set_color(BLUE);
+    }
+
 }
 
 void Entity::GravityEffect(int WIDTH, int HEIGHT, double GRAVITY){
-    this->set_vy(this->get_vy() + GRAVITY);
-    this->set_y(this->get_y() + this->get_vy());
-        if (this->get_y() + this->get_radius() > HEIGHT) { // Ground collision
-            this->set_y(HEIGHT - this->get_radius());
-            this->vy = -this->vy * BOUNCE; // Reset vertical velocity on ground contact
-        if (std::abs(this->get_vy()) < 0.1) {
-            this->set_vy(0.0); // Stop small bounces
+    // If resting on the ground, do not re-apply gravity
+    if (std::abs(this->get_vy()) < 1e-6 && std::abs((this->get_y() + this->get_radius()) - HEIGHT) < 1e-6) {
+        this->set_color(GREEN);
+        return;
+    }
+    // simple Euler integration
+    this->set_vy(this->get_vy() + GRAVITY); // apply gravity to vertical velocity
+    this->set_y(this->get_y() + this->get_vy()); // update vertical position
+    this->set_x(this->get_x() + this->get_vx()); // update horizontal position
+
+    // ground collision handling
+    if (this->get_y() + this->get_radius() >= HEIGHT) { // hit the ground
+        this->set_y(HEIGHT - this->get_radius());
+        this->set_vy(-this->get_vy() * BOUNCE); // reverse and reduce velocity
+        // If the bounce is very small, consider it resting
+        if (std::abs(this->get_vy()) < 0.3) {
+            this->set_vy(0.0);
+            this->set_color(GREEN);
         }
     }
 }
