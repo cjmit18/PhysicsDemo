@@ -151,7 +151,6 @@ void Entity::checkBounds(int WIDTH, int HEIGHT){
     if (getCollided()) {
         this->set_color(BLUE);
     }
-
 }
 
 void Entity::GravityEffect(int WIDTH, int HEIGHT, double GRAVITY){

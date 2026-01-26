@@ -7,15 +7,19 @@
 class Entity{
     
     private:
-    std::string name;
+    std::string name{"Player"};
+    Color color{GREEN};
     double x_pos{0.0};
     double y_pos{0.0};
     double z_pos{0.0};
     double radius{0.0};
     double vx{0.0};
     double vy{0.0};
-    Color color{GREEN};
-    bool isColliding{false}; 
+    bool isColliding{false};
+    bool isStatic{false};
+    bool isOnGround{false};
+    bool isAtCeiling{false};
+    bool markedForDeletion{false};
     
     public:
     Entity() = default;
@@ -35,14 +39,14 @@ class Entity{
     void set_vy(double vy);
     void set_color(Color color);
     Color get_color() const;
-    void checkInput();
+    void checkInput(double gravity);
     void checkBounds(int WIDTH, int HEIGHT);
     void GravityEffect(int width, int height, double GRAVITY);
     void setVelocity(double vx, double vy);
     void objectMovement(int WIDTH, int HEIGHT, double GRAVITY);
     bool getCollided() const;
     void setColliding(bool status);
-    
-
+    void markedForDeletionStatus(bool status);
+    bool isMarkedForDeletion() const;
 };
 #endif // Entity_H
