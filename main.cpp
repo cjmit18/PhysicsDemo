@@ -5,7 +5,7 @@
 #define WIDTH 900
 #define HEIGHT 600
 #define GRAVITY 0.50
-#define MAX_PLAYERS 10
+#define MAX_PLAYERS 1
 double x = WIDTH/2;
 double y = HEIGHT/2;
 
@@ -14,7 +14,13 @@ Entity *players[MAX_PLAYERS];
 void initializePlayers(){
   SetRandomSeed(time(NULL));
   for (int i{0}; i < MAX_PLAYERS; i++){
-    players[i] = new Entity((std::string("Player") + std::to_string(i+1)).c_str(), GetRandomValue(50, WIDTH-50), GetRandomValue(50, HEIGHT-50), 0, GetRandomValue(10,20), RED);
+    players[i] = new Entity((std::string("Player") + std::to_string(i+1)).c_str(),
+                            GetRandomValue(50, WIDTH-50),
+                            GetRandomValue(50, HEIGHT-50),
+                            0, 8, RED);
+    // lower initial random velocity so input and collisions behave predictably
+    players[i]->set_vx(GetRandomValue(-20,20));
+    players[i]->set_vy(GetRandomValue(-20,20));
   }
 }
 
@@ -100,18 +106,19 @@ void updatePlayerPositions(){
       }
     }
   }
-  drawPlayers();
+  // drawPlayers();  // <- removed: drawing must happen between BeginDrawing() and EndDrawing()
 }
 
-
 int main() {
-  initializePlayers();
-  InitWindow(WIDTH, HEIGHT, "MAIN WINDOW");
+  initializePlayers(); // initialize after window if you rely on raylib for random/colors
+  InitWindow(WIDTH, HEIGHT, "Basic Physics Simulation");
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
     updatePlayerPositions();
     BeginDrawing();
+    DrawFPS(820,0);
     ClearBackground(RAYWHITE);
+    drawPlayers(); // draw inside drawing block
     EndDrawing();
   }
   CloseWindow();

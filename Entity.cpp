@@ -1,10 +1,9 @@
 #include "Entity.h"
 #include "raylib.h"
 #include <cmath>
-#define WALK_SPEED 1.0
-#define BOUNCE 0.5
-#define FALLSPEED 0.5
-#define FLYSPEED -2.0
+#define BOUNCE 0.7
+#define FALLSPEED 1.0
+#define FLYSPEED -1.5
 
 Entity::Entity(const std::string &name, double x, double y, double z, double r, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), color(c) {}
 
@@ -78,17 +77,19 @@ void Entity::markedForDeletionStatus(bool status) {
     markedForDeletion = status;
 }
 void Entity::checkInput(double gravity){
-    // Horizontal: control velocity, don't modify position directly
+    // Horizontal: apply acceleration so input can overcome collision impulses
+    const double WALK_ACCEL = 0.6;
+    const double MAX_WALK_SPEED = 4.0;
     if (IsKeyDown(KEY_D)) {
-        this->set_vx(WALK_SPEED);
-    } 
-    else if (IsKeyDown(KEY_A)) {
-        this->set_vx(-WALK_SPEED);
-    } 
-    else {
+        this->set_vx(this->get_vx() + WALK_ACCEL);
+        if (this->get_vx() > MAX_WALK_SPEED) this->set_vx(MAX_WALK_SPEED);
+    } else if (IsKeyDown(KEY_A)) {
+        this->set_vx(this->get_vx() - WALK_ACCEL);
+        if (this->get_vx() < -MAX_WALK_SPEED) this->set_vx(-MAX_WALK_SPEED);
+    } else {
         // simple damping when no horizontal input
         this->set_vx(this->get_vx() * 0.8);
-        if (std::abs(this->get_vx()) < 0.1) this->set_vx(0.0);
+        if (std::abs(this->get_vx()) < 0.05) this->set_vx(0.0);
     }
     // Vertical: treat as velocity impulses instead of position edits
     if (IsKeyDown(KEY_W)) {
@@ -156,6 +157,7 @@ void Entity::checkBounds(int WIDTH, int HEIGHT){
 void Entity::GravityEffect(int WIDTH, int HEIGHT, double GRAVITY){
     // If resting on the ground, do not re-apply gravity
     if (std::abs(this->get_vy()) < 1e-6 && std::abs((this->get_y() + this->get_radius()) - HEIGHT) < 1e-6) {
+        this->set_x(this->get_x() + this->get_vx()); // update horizontal position
         this->set_color(GREEN);
         return;
     }
@@ -163,7 +165,6 @@ void Entity::GravityEffect(int WIDTH, int HEIGHT, double GRAVITY){
     this->set_vy(this->get_vy() + GRAVITY); // apply gravity to vertical velocity
     this->set_y(this->get_y() + this->get_vy()); // update vertical position
     this->set_x(this->get_x() + this->get_vx()); // update horizontal position
-
     // ground collision handling
     if (this->get_y() + this->get_radius() >= HEIGHT) { // hit the ground
         this->set_y(HEIGHT - this->get_radius());
@@ -171,7 +172,7 @@ void Entity::GravityEffect(int WIDTH, int HEIGHT, double GRAVITY){
         // If the bounce is very small, consider it resting
         if (std::abs(this->get_vy()) < 0.3) {
             this->set_vy(0.0);
-            this->set_color(GREEN);
+            this->set_color(YELLOW);
         }
     }
 }
