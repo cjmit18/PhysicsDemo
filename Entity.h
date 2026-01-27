@@ -4,6 +4,13 @@
 #include <string>
 #include "raylib.h"
 
+/**
+ * @brief Simple circular entity used by the physics demo.
+ *
+ * The Entity encapsulates position, velocity, radius and simple state flags.
+ * - Radius is used as a proxy for mass in collision resolution.
+ * - Methods provide input handling, simple physics integration, and boundary checks.
+ */
 class Entity{
     
     private:
@@ -20,11 +27,22 @@ class Entity{
     bool isOnGround{false};
     bool isAtCeiling{false};
     bool markedForDeletion{false};
+    bool canMove{false};
     
     public:
     Entity() = default;
+    /**
+     * @brief Construct a new Entity
+     * @param name Human-readable identifier (for debug)
+     * @param x Initial X position
+     * @param y Initial Y position
+     * @param z Unused Z coordinate (reserved)
+     * @param r Radius (also used as mass proxy)
+     * @param c Draw color
+     */
     Entity(const std::string &name, double x, double y, double z, double r, Color c);
 
+    // Accessors and mutators
     std::string get_name() const;
     void set_name(const std::string &new_name);
     double get_x() const;
@@ -39,11 +57,17 @@ class Entity{
     void set_vy(double vy);
     void set_color(Color color);
     Color get_color() const;
-    void checkInput(double gravity);
-    void checkBounds(int WIDTH, int HEIGHT);
-    void GravityEffect(int width, int height, double GRAVITY);
+    void setCanMove(bool status);
+    bool getCanMove() const; 
+
+    // Input, bounds and physics helpers
+    void checkInput(double gravity); ///< apply player inputs into velocity
+    void checkBounds(int WIDTH, int HEIGHT); ///< clamp position to window and set collision flags
+    void PhysicsEffect(int width, int height, double GRAVITY); ///< integrate velocities and apply gravity
     void setVelocity(double vx, double vy);
-    void objectMovement(int WIDTH, int HEIGHT, double GRAVITY);
+    void objectMovement(int WIDTH, int HEIGHT, double GRAVITY); ///< composite: input + physics + bounds
+
+    // Collision / lifecycle flags
     bool getCollided() const;
     void setColliding(bool status);
     void markedForDeletionStatus(bool status);

@@ -4,34 +4,39 @@
 #include <cmath>
 #define WIDTH 900
 #define HEIGHT 600
-#define GRAVITY 0.50
-#define MAX_PLAYERS 1
+#define GRAVITY 5.00
+#define MAX_ENTITIES 1000
 double x = WIDTH/2;
 double y = HEIGHT/2;
 
-Entity *players[MAX_PLAYERS];
+Entity *players[MAX_ENTITIES];
 
 void initializePlayers(){
+  // Create a pool of entities with randomized starting positions and small initial horizontal velocity.
+  // Names are generated for debug; color set to RED initially.
   SetRandomSeed(time(NULL));
-  for (int i{0}; i < MAX_PLAYERS; i++){
-    players[i] = new Entity((std::string("Player") + std::to_string(i+1)).c_str(),
+  for (int i{0}; i < MAX_ENTITIES; i++){
+    players[i] = new Entity(("player "+ std::to_string(i+1)).c_str(),
                             GetRandomValue(50, WIDTH-50),
                             GetRandomValue(50, HEIGHT-50),
-                            0, 8, RED);
-    // lower initial random velocity so input and collisions behave predictably
+                            0, 5, RED);
     players[i]->set_vx(GetRandomValue(-20,20));
-    players[i]->set_vy(GetRandomValue(-20,20));
+    //players[i]->set_vy(GetRandomValue(-20,20));
   }
 }
 
 void drawPlayers(){
-  for (int i{0}; i < MAX_PLAYERS; i++){
+  // Draw each active entity as a circle using the entity's stored color and radius.
+  for (int i{0}; i < MAX_ENTITIES; i++){
     if (!players[i]) continue;
     DrawCircle(players[i]->get_x(), players[i]->get_y(), players[i]->get_radius(), players[i]->get_color());
   }
 }
 
 static void resolveCollision(Entity *a, Entity *b) {
+  // Resolve interpenetration by moving objects proportionally to their "mass" (radius).
+  // Then compute an impulse along the collision normal using a restitution coefficient.
+  // This keeps objects from overlapping and gives a simple bounce response.
   double dx = a->get_x() - b->get_x(); // delta x
   double dy = a->get_y() - b->get_y(); // delta y
   double dist = std::sqrt(dx*dx + dy*dy); // distance between centers
@@ -80,14 +85,19 @@ static void resolveCollision(Entity *a, Entity *b) {
 }
 
 void updatePlayerPositions(){
+  // Per-frame update:
+  // 1) reset collision flags/colors
+  // 2) apply input, physics and bounds per entity
+  // 3) detect pairwise circle collisions and resolve them
+  // Entities flagged for deletion are cleaned up here.
   // Reset colliding state and color each frame
-  for (int i = 0; i < MAX_PLAYERS; ++i) {
+  for (int i = 0; i < MAX_ENTITIES; ++i) {
     if (!players[i]) continue;
     players[i]->setColliding(false);
     players[i]->set_color(RED); // reset to default (matches initializePlayers)
   }
 
-  for (int i{0}; i < MAX_PLAYERS; i++){
+  for (int i{0}; i < MAX_ENTITIES; i++){
     if (!players[i]) continue;
     players[i]->objectMovement(WIDTH, HEIGHT, GRAVITY);
     if (players[i]->isMarkedForDeletion()) {
@@ -96,7 +106,7 @@ void updatePlayerPositions(){
       continue;
     }
     Vector2 center1 = {static_cast<float>(players[i]->get_x()), static_cast<float>(players[i]->get_y())};
-    for (int j{i+1}; j < MAX_PLAYERS; j++){
+    for (int j{i+1}; j < MAX_ENTITIES; j++){
       if (!players[j]) continue;
       Vector2 center2 = {static_cast<float>(players[j]->get_x()), static_cast<float>(players[j]->get_y())};
       if (CheckCollisionCircles(center1, static_cast<float>(players[i]->get_radius()), center2, static_cast<float>(players[j]->get_radius()))) {
@@ -106,12 +116,13 @@ void updatePlayerPositions(){
       }
     }
   }
-  // drawPlayers();  // <- removed: drawing must happen between BeginDrawing() and EndDrawing()
 }
 
 int main() {
-  initializePlayers(); // initialize after window if you rely on raylib for random/colors
+  // Initialize window, spawn entities and run simulation loop at fixed target FPS.
   InitWindow(WIDTH, HEIGHT, "Basic Physics Simulation");
+  initializePlayers();
+  players[0]->setCanMove(true); // allow only the first player to be controlled
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
     updatePlayerPositions();

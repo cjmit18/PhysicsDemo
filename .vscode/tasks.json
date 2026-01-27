@@ -15,7 +15,7 @@
                 "-LC:/raylib/lib",
                 "-lraylib",
                 "-lgdi32",
-                "-lwinmm",
+                "-lwinmm"
             ],
             "options": {
                 "cwd": "${fileDirname}"
