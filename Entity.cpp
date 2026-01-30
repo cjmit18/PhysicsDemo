@@ -8,14 +8,15 @@
 // - MAX_FALL_SPEED: clamp for downward velocity to avoid runaway.
 // - FLYSPEED: instantaneous upward velocity when W is pressed.
 // - WALK_ACCEL / MAX_WALK_SPEED: horizontal control responsiveness/clamp.
-#define BOUNCE 0.0
 #define FALL_ACCEL 1.0
-#define MAX_FALL_SPEED 10.0
-#define FLYSPEED -1.5
-#define WALK_ACCEL 1.0
-#define MAX_WALK_SPEED 5.0
-#define MAX_RADIUS 5.0
+#define MAX_FALL_SPEED 1.0
+#define FLYSPEED 1.0
+#define MAX_FLY_SPEED -3.0
+#define WALK_ACCEL 0.6
+#define MAX_WALK_SPEED 1.0
+#define MAX_RADIUS 15.0
 #define MIN_RADIUS 1.0
+#define SPEED_MULT 60.0
 
 Entity::Entity(const std::string &name, double x, double y, double z, double r, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), color(c) {}
 
@@ -69,10 +70,9 @@ void Entity::set_color(Color color) {
 Color Entity::get_color() const {
     return color;
 }
-void Entity::objectMovement(int WIDTH, int HEIGHT, double gravity) {
+void Entity::objectMovement(int WIDTH, int HEIGHT) {
     // Composite step: read input, apply physics integration, enforce bounds.
-    this->checkInput(gravity);
-    this->PhysicsEffect(WIDTH, HEIGHT, gravity);
+    this->checkInput();
     this->checkBounds(WIDTH, HEIGHT);
 }
 
@@ -95,31 +95,44 @@ void Entity::setCanMove(bool status) {
 bool Entity::getCanMove() const {
     return canMove;
 }
-void Entity::checkInput(double gravity){
+void Entity::checkInput(){
+    float dt = GetFrameTime();
     // Horizontal: apply acceleration so input can overcome collision impulses
     // Damping when no input helps objects come to rest.
     if (getCanMove()) {
         if (IsKeyDown(KEY_D)) {
-            this->set_vx(this->get_vx() + WALK_ACCEL);
-            if (this->get_vx() > MAX_WALK_SPEED) {
-                this->set_vx(MAX_WALK_SPEED);
+            this->set_vx(this->get_vx() + WALK_ACCEL * dt * SPEED_MULT);
+            if (this->get_vx() > MAX_WALK_SPEED * SPEED_MULT) {
+                this->set_vx(MAX_WALK_SPEED * SPEED_MULT);
             }
         } 
         else if (IsKeyDown(KEY_A)) {
-            this->set_vx(this->get_vx() - WALK_ACCEL);
-                if (this->get_vx() < -MAX_WALK_SPEED) {
-                    this->set_vx(-MAX_WALK_SPEED);
+            this->set_vx(this->get_vx() - WALK_ACCEL * dt * SPEED_MULT);
+                if (this->get_vx() < -MAX_WALK_SPEED * SPEED_MULT) {
+                    this->set_vx(-MAX_WALK_SPEED * SPEED_MULT);
                 }
             }
         // Vertical: treat as velocity impulses instead of position edits
         if (IsKeyDown(KEY_W)) {
-            this->set_vy(FLYSPEED);
+            this->set_vy(this->get_vy() - (FLYSPEED * dt * SPEED_MULT)); // impulse scaled by multiplier
+            if (this->get_vy() < MAX_FLY_SPEED) {
+                this->set_vy(MAX_FLY_SPEED);
+            }
         }
         if (IsKeyDown(KEY_S)) {
             // apply fall acceleration as frame-rate independent increment
-            this->set_vy(this->get_vy() + (FALL_ACCEL * GetFrameTime()));
+            this->set_vy(this->get_vy() + (FALL_ACCEL * dt * SPEED_MULT));
+            if (this->get_vy() > MAX_FALL_SPEED) {
+                this->set_vy(MAX_FALL_SPEED);
+            }
         }
-
+    }
+        if ((!getCanMove() && !(IsKeyDown(KEY_D) || IsKeyDown(KEY_A)))) {
+            this->set_vx(this->get_vx() * 0.8);
+            if (std::abs(this->get_vx()) < 0.05){
+                this->set_vx(0.0);
+            }
+        }
         if (IsKeyDown(KEY_EQUAL)) {
             this->set_radius(this->get_radius() + 1.0);
             if (this->get_radius() > MAX_RADIUS) {
@@ -135,13 +148,7 @@ void Entity::checkInput(double gravity){
         if (IsKeyDown(KEY_DELETE)) {
             this->markedForDeletionStatus(true);
             }
-        }
-        if ((!getCanMove() && !(IsKeyDown(KEY_D) || IsKeyDown(KEY_A)))) {
-            this->set_vx(this->get_vx() * 0.8);
-            if (std::abs(this->get_vx()) < 0.05){
-                this->set_vx(0.0);
-            }
-        }
+
 }
 void Entity::checkBounds(int WIDTH, int HEIGHT){
     // Enforce window boundaries and set collision/on-ground flags.
@@ -178,28 +185,3 @@ void Entity::checkBounds(int WIDTH, int HEIGHT){
         this->set_color(BLUE);
     }
  }
-
-void Entity::PhysicsEffect(int WIDTH, int HEIGHT, double GRAVITY){
-    // If entity is effectively at rest on the ground, skip re-applying gravity and only
-    // update horizontal position. This prevents jitter when vy is near zero.
-    if (std::abs(this->get_vy()) < 1e-6 && std::abs((this->get_y() + this->get_radius()) - HEIGHT) < 1e-6) {
-        this->set_x(this->get_x() + this->get_vx()); // update horizontal position
-        this->set_color(GREEN);
-        return;
-    }
-    // Simple Euler integration using GetFrameTime() for frame-rate independence.
-    this->set_vy(this->get_vy() + (GRAVITY*GetFrameTime())); // apply gravity
-    if (this->get_vy() > MAX_FALL_SPEED) this->set_vy(MAX_FALL_SPEED);
-    this->set_y(this->get_y() + this->get_vy()); // update vertical position
-    this->set_x(this->get_x() + this->get_vx()); // update horizontal position
-
-    // Ground collision handling: snap to ground and apply restitution. Small bounces are suppressed.
-    if (this->get_y() + this->get_radius() >= HEIGHT) { // hit the ground
-        this->set_y(HEIGHT - this->get_radius());
-        this->set_vy(-this->get_vy() * BOUNCE); // reverse and reduce velocity
-        if (std::abs(this->get_vy()) < 0.3) {
-            this->set_vy(0.0);
-            this->set_color(PURPLE);
-        }
-    }
-}

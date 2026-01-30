@@ -1,15 +1,18 @@
 #include "raylib.h"
 #include "Entity.h"
+#include "physicsEffects.h"
 #include <ctime>
 #include <cmath>
+#include <vector>
 #define WIDTH 900
 #define HEIGHT 600
-#define GRAVITY 5.00
-#define MAX_ENTITIES 1000
+#define MAX_ENTITIES 1
 double x = WIDTH/2;
 double y = HEIGHT/2;
 
-Entity *players[MAX_ENTITIES];
+// Pre-size the players vector to avoid out-of-bounds access on startup
+std::vector<Entity*> players(MAX_ENTITIES);
+PhysicsEffects physics(WIDTH, HEIGHT);
 
 void initializePlayers(){
   // Create a pool of entities with randomized starting positions and small initial horizontal velocity.
@@ -20,8 +23,9 @@ void initializePlayers(){
                             GetRandomValue(50, WIDTH-50),
                             GetRandomValue(50, HEIGHT-50),
                             0, 5, RED);
-    players[i]->set_vx(GetRandomValue(-20,20));
+    //players[i]->set_vx(GetRandomValue(-20,20));
     //players[i]->set_vy(GetRandomValue(-20,20));
+    physics.addToEntityList(players[i]);
   }
 }
 
@@ -99,7 +103,7 @@ void updatePlayerPositions(){
 
   for (int i{0}; i < MAX_ENTITIES; i++){
     if (!players[i]) continue;
-    players[i]->objectMovement(WIDTH, HEIGHT, GRAVITY);
+    players[i]->objectMovement(WIDTH, HEIGHT);
     if (players[i]->isMarkedForDeletion()) {
       delete players[i];
       players[i] = nullptr;
@@ -122,14 +126,15 @@ int main() {
   // Initialize window, spawn entities and run simulation loop at fixed target FPS.
   InitWindow(WIDTH, HEIGHT, "Basic Physics Simulation");
   initializePlayers();
-  players[0]->setCanMove(true); // allow only the first player to be controlled
+  players[0]->setCanMove(true);
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
+    physics.applyGravity();
     updatePlayerPositions();
     BeginDrawing();
     DrawFPS(820,0);
     ClearBackground(RAYWHITE);
-    drawPlayers(); // draw inside drawing block
+    drawPlayers(); 
     EndDrawing();
   }
   CloseWindow();

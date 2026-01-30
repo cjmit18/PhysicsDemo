@@ -61,11 +61,10 @@ class Entity{
     bool getCanMove() const; 
 
     // Input, bounds and physics helpers
-    void checkInput(double gravity); ///< apply player inputs into velocity
+    void checkInput(); ///< apply player inputs into velocity
     void checkBounds(int WIDTH, int HEIGHT); ///< clamp position to window and set collision flags
-    void PhysicsEffect(int width, int height, double GRAVITY); ///< integrate velocities and apply gravity
     void setVelocity(double vx, double vy);
-    void objectMovement(int WIDTH, int HEIGHT, double GRAVITY); ///< composite: input + physics + bounds
+    void objectMovement(int WIDTH, int HEIGHT); ///< composite: input + physics + bounds
 
     // Collision / lifecycle flags
     bool getCollided() const;
