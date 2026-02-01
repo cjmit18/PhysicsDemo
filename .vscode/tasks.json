@@ -10,6 +10,8 @@
                 "${file}",
                 "Entity.cpp",
                 "PhysicsEffects.cpp",
+                "inputManager.cpp",
+                "windowInteractions.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-IC:/raylib/include",

@@ -4,26 +4,24 @@
 
 // Physics tuning constants:
 // - BOUNCE: restitution multiplier applied on ground contact (0 => no bounce).
-// - FALL_ACCEL: additional downward acceleration when holding S.
+// - FALL_SPEED: additional downward acceleration when holding S.
 // - MAX_FALL_SPEED: clamp for downward velocity to avoid runaway.
 // - FLYSPEED: instantaneous upward velocity when W is pressed.
-// - WALK_ACCEL / MAX_WALK_SPEED: horizontal control responsiveness/clamp.
-#define FALL_ACCEL 1.0
-#define MAX_FALL_SPEED 1.0
-#define FLYSPEED 1.0
-#define MAX_FLY_SPEED -3.0
-#define WALK_ACCEL 0.6
-#define MAX_WALK_SPEED 1.0
-#define MAX_RADIUS 15.0
-#define MIN_RADIUS 1.0
-#define SPEED_MULT 60.0
+// - WALK_SPEED / MAX_WALK_SPEED: horizontal control responsiveness/clamp.
 
 Entity::Entity(const std::string &name, double x, double y, double z, double r, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), color(c) {}
 
+
+void Entity::showInfo(){
+    // Debug function to print entity info to console
+    DrawText(("Entity: " + this->get_name()).c_str(), 10, 10, 10, BLACK);
+    DrawText(("Position: (" + std::to_string(this->get_x()) + ", " + std::to_string(this->get_y()) + ")").c_str(), 10, 25, 10, BLACK);
+    DrawText(("Velocity: (" + std::to_string(this->get_vx()) + ", " + std::to_string(this->get_vy()) + ")").c_str(), 10, 40, 10, BLACK);
+    DrawText(("Radius: " + std::to_string(this->get_radius())).c_str(), 10, 55, 10, BLACK);
+}
 std::string Entity::get_name() const {
         return name;
     }
-
 
 void Entity::set_name(const std::string &new_name) {
     name = new_name;
@@ -53,6 +51,13 @@ void Entity::set_vy(double vy) {
     this->vy = vy;
 }
 
+void Entity::addToVx(double dvx) {
+    this->vx += dvx; // accumulate change in velocity
+}
+void Entity::addToVy(double dvy) {
+    this->vy += dvy;
+}
+
 void Entity::setVelocity(double vx, double vy) {
     this->vx = vx; // assign instead of accumulate
     this->vy = vy;
@@ -70,18 +75,23 @@ void Entity::set_color(Color color) {
 Color Entity::get_color() const {
     return color;
 }
-void Entity::objectMovement(int WIDTH, int HEIGHT) {
-    // Composite step: read input, apply physics integration, enforce bounds.
-    this->checkInput();
-    this->checkBounds(WIDTH, HEIGHT);
-}
-
 void Entity::setColliding(bool status) {
     isColliding = status;
 }
-
 bool Entity::getCollided() const {
     return isColliding;
+}
+bool Entity::getOnGround() const{
+    return isOnGround;
+}
+void Entity::setOnGround(bool status){
+    isOnGround = status;
+}
+bool Entity::getAtCeiling() const{
+    return isAtCeiling;
+}
+void Entity::setAtCeiling(bool status){
+    isAtCeiling = status;
 }
 bool Entity::isMarkedForDeletion() const {
     return markedForDeletion;
@@ -95,93 +105,8 @@ void Entity::setCanMove(bool status) {
 bool Entity::getCanMove() const {
     return canMove;
 }
-void Entity::checkInput(){
-    float dt = GetFrameTime();
-    // Horizontal: apply acceleration so input can overcome collision impulses
-    // Damping when no input helps objects come to rest.
-    if (getCanMove()) {
-        if (IsKeyDown(KEY_D)) {
-            this->set_vx(this->get_vx() + WALK_ACCEL * dt * SPEED_MULT);
-            if (this->get_vx() > MAX_WALK_SPEED * SPEED_MULT) {
-                this->set_vx(MAX_WALK_SPEED * SPEED_MULT);
-            }
-        } 
-        else if (IsKeyDown(KEY_A)) {
-            this->set_vx(this->get_vx() - WALK_ACCEL * dt * SPEED_MULT);
-                if (this->get_vx() < -MAX_WALK_SPEED * SPEED_MULT) {
-                    this->set_vx(-MAX_WALK_SPEED * SPEED_MULT);
-                }
-            }
-        // Vertical: treat as velocity impulses instead of position edits
-        if (IsKeyDown(KEY_W)) {
-            this->set_vy(this->get_vy() - (FLYSPEED * dt * SPEED_MULT)); // impulse scaled by multiplier
-            if (this->get_vy() < MAX_FLY_SPEED) {
-                this->set_vy(MAX_FLY_SPEED);
-            }
-        }
-        if (IsKeyDown(KEY_S)) {
-            // apply fall acceleration as frame-rate independent increment
-            this->set_vy(this->get_vy() + (FALL_ACCEL * dt * SPEED_MULT));
-            if (this->get_vy() > MAX_FALL_SPEED) {
-                this->set_vy(MAX_FALL_SPEED);
-            }
-        }
-    }
-        if ((!getCanMove() && !(IsKeyDown(KEY_D) || IsKeyDown(KEY_A)))) {
-            this->set_vx(this->get_vx() * 0.8);
-            if (std::abs(this->get_vx()) < 0.05){
-                this->set_vx(0.0);
-            }
-        }
-        if (IsKeyDown(KEY_EQUAL)) {
-            this->set_radius(this->get_radius() + 1.0);
-            if (this->get_radius() > MAX_RADIUS) {
-                this->set_radius(MAX_RADIUS);
-            }
-        }
-        if (IsKeyDown(KEY_MINUS)) {
-            this->set_radius(this->get_radius() - 1.0);
-            if (this->get_radius() < MIN_RADIUS) {
-                this->set_radius(MIN_RADIUS);
-            }
-        }
-        if (IsKeyDown(KEY_DELETE)) {
-            this->markedForDeletionStatus(true);
-            }
-
+void Entity::resetFlags() {
+    isColliding = false;
+    isOnGround = false;
+    isAtCeiling = false;
 }
-void Entity::checkBounds(int WIDTH, int HEIGHT){
-    // Enforce window boundaries and set collision/on-ground flags.
-    // When hitting the top, vertical velocity is zeroed; hitting bottom may set isOnGround.
-    // A radius larger than screen half-size is clamped and treated as colliding.
-    double maxRadius = std::min(WIDTH/2.0 , HEIGHT/2.0);
-    if (this->get_radius() > maxRadius) {
-        this->set_radius(maxRadius);
-        this->isColliding = true;
-    }
-    if (this->get_x() - this->get_radius() < 0) { // Left bound
-        this->set_x(this->get_radius());
-        this->isColliding = true;
-    }
-    if (this->get_x() + this->get_radius() > WIDTH) { // Right bound
-        this->set_x(WIDTH - this->get_radius());
-        this->isColliding = true;
-    }
-    if (this->get_y() - this->get_radius() < 0) { // Top bound
-        this->set_y(this->get_radius());
-        this->set_vy(0.0); // stop upward movement
-        this->isAtCeiling = true;
-        this->isColliding = true;
-    }
-    if (this->get_y() + this->get_radius() >= HEIGHT) { // Bottom bound
-        this->set_y(HEIGHT - this->get_radius());
-        // if still moving vertically consider it a collision, otherwise treat as resting
-        if (std::abs(this->get_vy()) > 1e-3) {
-            this->isColliding = true;
-            this->isOnGround = true;
-        }
-    }
-     if (getCollided()) {
-        this->set_color(BLUE);
-    }
- }

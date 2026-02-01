@@ -1,9 +1,8 @@
 #ifndef Entity_H
 #define Entity_H
-
 #include <string>
 #include "raylib.h"
-
+#include "config.h"
 /**
  * @brief Simple circular entity used by the physics demo.
  *
@@ -58,18 +57,24 @@ class Entity{
     void set_color(Color color);
     Color get_color() const;
     void setCanMove(bool status);
-    bool getCanMove() const; 
+    bool getCanMove() const;
+    void addToVx(double dvx);
+    void addToVy(double dvy);
 
     // Input, bounds and physics helpers
-    void checkInput(); ///< apply player inputs into velocity
-    void checkBounds(int WIDTH, int HEIGHT); ///< clamp position to window and set collision flags
+    //void checkBounds(); ///< clamp position to window and set collision flags
     void setVelocity(double vx, double vy);
-    void objectMovement(int WIDTH, int HEIGHT); ///< composite: input + physics + bounds
+    void showInfo(); ///< debug: print entity info to console
 
     // Collision / lifecycle flags
     bool getCollided() const;
     void setColliding(bool status);
+    bool getOnGround() const;
+    bool getAtCeiling() const;
+    void setOnGround(bool status);
+    void setAtCeiling(bool status);
     void markedForDeletionStatus(bool status);
     bool isMarkedForDeletion() const;
+    void resetFlags(); ///< reset collision and state flags each frame
 };
 #endif // Entity_H

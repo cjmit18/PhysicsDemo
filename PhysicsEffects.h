@@ -6,13 +6,11 @@
 class PhysicsEffects {
     private:
     std::vector<Entity*> entity_ptr;
-    int WIDTH{900};
-    int HEIGHT{600};
-     
     public:
-    PhysicsEffects(int WIDTH, int HEIGHT);
+    PhysicsEffects() = default;
 
-    void applyGravity(); 
+    void applyGravity();
     void addToEntityList(Entity *entity);
+    void removeFromEntityList(Entity *entity);
 };
 #endif // PhysicsEffects_h

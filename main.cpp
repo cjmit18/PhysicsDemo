@@ -1,18 +1,21 @@
 #include "raylib.h"
 #include "Entity.h"
 #include "physicsEffects.h"
+#include "inputManager.h"
+#include "windowInteractionss.h"
+#include "config.h"
 #include <ctime>
 #include <cmath>
 #include <vector>
-#define WIDTH 900
-#define HEIGHT 600
-#define MAX_ENTITIES 1
+
 double x = WIDTH/2;
 double y = HEIGHT/2;
 
 // Pre-size the players vector to avoid out-of-bounds access on startup
 std::vector<Entity*> players(MAX_ENTITIES);
-PhysicsEffects physics(WIDTH, HEIGHT);
+PhysicsEffects physics;
+inputManager inputMgr;
+windowInteractions windowInt;
 
 void initializePlayers(){
   // Create a pool of entities with randomized starting positions and small initial horizontal velocity.
@@ -26,6 +29,8 @@ void initializePlayers(){
     //players[i]->set_vx(GetRandomValue(-20,20));
     //players[i]->set_vy(GetRandomValue(-20,20));
     physics.addToEntityList(players[i]);
+    inputMgr.addToEntityList(players[i]);
+    windowInt.addToEntityList(players[i]);
   }
 }
 
@@ -82,10 +87,10 @@ static void resolveCollision(Entity *a, Entity *b) {
   double jx = j * nx; // impulse x
   double jy = j * ny; // impulse y
 
-  a->set_vx(a->get_vx() + jx / ma); // update velocity of a
-  a->set_vy(a->get_vy() + jy / ma); // update velocity of a
-  b->set_vx(b->get_vx() - jx / mb); // update velocity of b
-  b->set_vy(b->get_vy() - jy / mb); // update velocity of b
+  a->addToVx(jx / ma); // was: a->set_vx(a->get_vx() + jx / ma);
+  a->addToVy(jy / ma); // was: a->set_vy(a->get_vy() + jy / ma);
+  b->addToVx(-jx / mb); // was: b->set_vx(b->get_vx() - jx / mb);
+  b->addToVy(-jy / mb); // was: b->set_vy(b->get_vy() - jy / mb);
 }
 
 void updatePlayerPositions(){
@@ -95,19 +100,22 @@ void updatePlayerPositions(){
   // 3) detect pairwise circle collisions and resolve them
   // Entities flagged for deletion are cleaned up here.
   // Reset colliding state and color each frame
-  for (int i = 0; i < MAX_ENTITIES; ++i) {
-    if (!players[i]) continue;
-    players[i]->setColliding(false);
-    players[i]->set_color(RED); // reset to default (matches initializePlayers)
-  }
+  // Process inputs and physics once per frame (not per-entity)
+  inputMgr.processInputs();
+  physics.applyGravity();
+  windowInt.checkAllBounds();
 
   for (int i{0}; i < MAX_ENTITIES; i++){
-    if (!players[i]) continue;
-    players[i]->objectMovement(WIDTH, HEIGHT);
-    if (players[i]->isMarkedForDeletion()) {
-      delete players[i];
-      players[i] = nullptr;
+    if (!players[i]) {
       continue;
+    }
+    if (players[i]->isMarkedForDeletion()) {
+        physics.removeFromEntityList(players[i]);
+        inputMgr.removeFromEntityList(players[i]);
+        windowInt.removeFromEntityList(players[i]);
+        delete players[i];
+        players[i] = nullptr;
+        continue;
     }
     Vector2 center1 = {static_cast<float>(players[i]->get_x()), static_cast<float>(players[i]->get_y())};
     for (int j{i+1}; j < MAX_ENTITIES; j++){
@@ -129,10 +137,12 @@ int main() {
   players[0]->setCanMove(true);
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
-    physics.applyGravity();
     updatePlayerPositions();
     BeginDrawing();
     DrawFPS(820,0);
+    if (players[0]) {
+      players[0]->showInfo();
+    }
     ClearBackground(RAYWHITE);
     drawPlayers(); 
     EndDrawing();
