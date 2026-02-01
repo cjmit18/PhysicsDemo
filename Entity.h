@@ -1,14 +1,18 @@
+// Entity: simple circular object used by physics demo.
+// Radius used as collision radius; weight used as mass proxy in collisions and friction calculations.
+
 #ifndef Entity_H
 #define Entity_H
 #include <string>
 #include "raylib.h"
 #include "config.h"
+
 /**
  * @brief Simple circular entity used by the physics demo.
  *
  * The Entity encapsulates position, velocity, radius and simple state flags.
  * - Radius is used as a proxy for mass in collision resolution.
- * - Methods provide input handling, simple physics integration, and boundary checks.
+ * - Velocities are in pixels/s; positions in pixels.
  */
 class Entity{
     
@@ -37,10 +41,10 @@ class Entity{
     /**
      * @brief Construct a new Entity
      * @param name Human-readable identifier (for debug)
-     * @param x Initial X position
-     * @param y Initial Y position
+     * @param x Initial X position (pixels)
+     * @param y Initial Y position (pixels)
      * @param z Unused Z coordinate (reserved)
-     * @param r Radius (also used as mass proxy)
+     * @param r Radius in pixels (also used as mass proxy)
      * @param weight Weight (mass)
      * @param c Draw color
      */
@@ -65,13 +69,12 @@ class Entity{
     double getWeight() const;
     void setCanMove(bool status);
     bool getCanMove() const;
-    void addToVx(double dvx);
-    void addToVy(double dvy);
+    void addToVx(double dvx); ///< add change in velocity (pixels/s)
+    void addToVy(double dvy); ///< add change in velocity (pixels/s)
 
     // Input, bounds and physics helpers
-    //void checkBounds(); ///< clamp position to window and set collision flags
     void setVelocity(double vx, double vy);
-    void showInfo(); ///< debug: print entity info to console
+    void showInfo(); ///< debug: draw entity info on screen
 
     // Collision / lifecycle flags
     bool getCollided() const;
@@ -87,7 +90,7 @@ class Entity{
     void markedForDeletionStatus(bool status);
     bool isMarkedForDeletion() const;
     void resetFlags(); ///< reset collision and state flags each frame
-    bool isEntityBouncy() const;
+    bool getEntityBouncy() const;
     void setEntityBouncy(bool status);
     void setStatic(bool status);
     bool getEntityStatic() const;

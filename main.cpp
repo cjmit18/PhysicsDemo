@@ -1,3 +1,8 @@
+// Main loop and collision detection/resolution for physics demo.
+// Key notes:
+//  - resolveCollision uses weight (or radius) as mass, clamps per-step positional correction, and avoids divide-by-zero by using deterministic jitter.
+//  - DetectCollison iterates valid pointers only and resets flags before collision pass.
+
 #include "raylib.h"
 #include "Entity.h"
 #include "physicsEffects.h"
@@ -8,8 +13,10 @@
 #include <cmath>
 #include <vector>
 
-double x = WIDTH/2;
-double y = HEIGHT/2;
+double x = GetScreenWidth()/2;
+double y = GetScreenHeight()/2;
+int width = 2560;
+int height = 13f00;
 
 // Pre-size the players vector to avoid out-of-bounds access on startup
 std::vector<Entity*> players(MAX_ENTITIES);
@@ -22,10 +29,17 @@ void initializePlayers(){
   // Names are generated for debug; color set to RED initially.
   SetRandomSeed(time(NULL));
   for (int i{0}; i < MAX_ENTITIES; i++){
-    players[i] = new Entity(("player "+ std::to_string(i+1)).c_str(),
-                            WIDTH/2 + GetRandomValue(-100,100),
-                            HEIGHT/2 + GetRandomValue(-100,100),
+    Entity* player = new Entity("player "+ std::to_string(i+1),
+                            x + GetRandomValue(0,2560),
+                            y + GetRandomValue(0,2000),
                             0, GetRandomValue(1,5), GetRandomValue(1,100), RED);
+    if (player == nullptr) {
+      continue;
+    }
+    if (players[i] == player) {
+      continue; // already assigned
+    }
+    players[i] = player;
     players[i]->set_vx(GetRandomValue(-20,20));
     players[i]->set_vy(GetRandomValue(-20,20));
     physics.addToEntityList(players[i]);
@@ -33,7 +47,23 @@ void initializePlayers(){
     windowInt.addToEntityList(players[i]);
   }
 }
-
+void SpawnEntity(double x, double y, double radius, double weight, Color color, int nEnts){
+  // Spawn a new entity at the specified position with given properties.
+  for (int i{0}; i < nEnts; i++){
+    if (players[i] != nullptr) {
+      continue;
+    }
+    Entity* newEntity = new Entity("player " + std::to_string(i+1), x, y, 0, radius, weight, color);
+    if (newEntity == nullptr) {
+      return; // allocation failed
+    }
+    players[i] = newEntity;
+    physics.addToEntityList(players[i]);
+    inputMgr.addToEntityList(players[i]);
+    windowInt.addToEntityList(players[i]);
+    return; // spawned successfully
+  }
+}
 void drawPlayers(){
   // Draw each active entity as a circle using the entity's stored color and radius.
   for (int i{0}; i < MAX_ENTITIES; i++){
@@ -45,18 +75,45 @@ void drawPlayers(){
 static void resolveCollision(Entity *a, Entity *b) {
   // Resolve interpenetration by moving objects proportionally to their "mass" (radius).
   // Then compute an impulse along the collision normal using a restitution coefficient.
-  // This keeps objects from overlapping and gives a simple bounce response.
+  // Safety: handle zero-distance case by using relative velocity or deterministic jitter to avoid NaNs.
   double dx = a->get_x() - b->get_x(); // delta x
   double dy = a->get_y() - b->get_y(); // delta y
   double dist = std::sqrt(dx*dx + dy*dy); // distance between centers
-  if (dist == 0.0) { dx = 1.0; dist = 1.0; } // avoid div by zero
 
-  double overlap = (a->get_radius() + b->get_radius()) - dist; // penetration depth
-  if (overlap <= 0.0) return; 
+  // penetration depth
+  double overlap = (a->get_radius() + b->get_radius()) - dist;
+  if (overlap <= 0.0) return;
 
-  // Normal vector
-  double nx = dx / dist; // normalized delta x
-  double ny = dy / dist; // normalized delta y
+  // Normal (safe): handle degenerate zero-distance case with an epsilon
+  const double eps = 1e-8;
+  double nx = 0.0, ny = 0.0;
+  if (dist > eps) {
+    nx = dx / dist;
+    ny = dy / dist;
+  } else {
+    // Fallback 1: use relative velocity direction (push opposite to approach)
+    double rvx = a->get_vx() - b->get_vx();
+    double rvy = a->get_vy() - b->get_vy();
+    double rvLen = std::sqrt(rvx*rvx + rvy*rvy);
+    if (rvLen > eps) {
+      nx = -rvx / rvLen;
+      ny = -rvy / rvLen;
+    } else {
+      // Fallback 2: deterministic jitter based on pointer addresses to avoid NaNs
+      size_t ha = reinterpret_cast<size_t>(a);
+      size_t hb = reinterpret_cast<size_t>(b);
+      double seed = double((ha ^ (hb << 1)) & 0xFFFF) / double(0xFFFF);
+      double angle = seed * 2.0 * PI;
+      nx = std::cos(angle);
+      ny = std::sin(angle);
+    }
+    // avoid exact-zero normal
+    double nlen = std::sqrt(nx*nx + ny*ny);
+    if (nlen <= eps) { nx = 1.0; ny = 0.0; nlen = 1.0; }
+    nx /= nlen; ny /= nlen;
+    // set a small nonzero dist so overlap computation remains sensible downstream
+    dist = eps;
+  }
 
   // Use `weight` as mass if available; fall back to radius as proxy.
   double ma_raw = a->getWeight() > 0.0 ? a->getWeight() : a->get_radius();
@@ -65,13 +122,30 @@ static void resolveCollision(Entity *a, Entity *b) {
   double mb = std::max(1.0, mb_raw); // mass of b
   double total = ma + mb;
 
-  // Separate proportional to mass
-  a->set_x(a->get_x() + nx * (overlap * (mb / total))); // move a out
-  a->set_y(a->get_y() + ny * (overlap * (mb / total))); // move a out
-  b->set_x(b->get_x() - nx * (overlap * (ma / total))); // move b out
-  b->set_y(b->get_y() - ny * (overlap * (ma / total))); // move b out
- 
-  // Relative velocity
+  // Positional correction: respect static objects and clamp per-step correction
+  double moveA = 0.0, moveB = 0.0;
+  if (a->getEntityStatic() && b->getEntityStatic()) {
+    // both static: do not move, only resolve velocities (if desired)
+    moveA = moveB = 0.0;
+  } else if (a->getEntityStatic()) {
+    moveA = 0.0; moveB = overlap;
+  } else if (b->getEntityStatic()) {
+    moveA = overlap; moveB = 0.0;
+  } else {
+    moveA = overlap * (mb / total);
+    moveB = overlap * (ma / total);
+  }
+  // Clamp per-body move to at most half the overlap to avoid teleporting
+  double maxPerBody = 0.5 * overlap;
+  if (moveA > maxPerBody) moveA = maxPerBody;
+  if (moveB > maxPerBody) moveB = maxPerBody;
+
+  a->set_x(a->get_x() + nx * moveA);
+  a->set_y(a->get_y() + ny * moveA);
+  b->set_x(b->get_x() - nx * moveB);
+  b->set_y(b->get_y() - ny * moveB);
+
+  // Relative velocity (recompute if needed)
   double rvx = a->get_vx() - b->get_vx(); // delta vx
   double rvy = a->get_vy() - b->get_vy(); // delta vy
   double velAlongNormal = rvx * nx + rvy * ny; // velocity along normal
@@ -82,28 +156,34 @@ static void resolveCollision(Entity *a, Entity *b) {
   // Restitution (bounciness)
   double e = 0.6;
 
-  // Impulse scalar
-  double j = -(1.0 + e) * velAlongNormal; 
-  j /= (1.0/ma + 1.0/mb); 
+  // Impulse scalar with static-object safety
+  double invMa = a->getEntityStatic() ? 0.0 : (1.0 / ma);
+  double invMb = b->getEntityStatic() ? 0.0 : (1.0 / mb);
+  double denom = (invMa + invMb);
+  if (denom <= 0.0) return; // both static or invalid, skip impulse
+
+  double j = -(1.0 + e) * velAlongNormal;
+  j /= denom;
 
   double jx = j * nx; // impulse x
   double jy = j * ny; // impulse y
 
-  a->addToVx(jx / ma); // was: a->set_vx(a->get_vx() + jx / ma);
-  a->addToVy(jy / ma); // was: a->set_vy(a->get_vy() + jy / ma);
-  b->addToVx(-jx / mb); // was: b->set_vx(b->get_vx() - jx / mb);
-  b->addToVy(-jy / mb); // was: b->set_vy(b->get_vy() - jy / mb);
+  if (!a->getEntityStatic()) { a->addToVx(jx * invMa); a->addToVy(jy * invMa); }
+  if (!b->getEntityStatic()) { b->addToVx(-jx * invMb); b->addToVy(-jy * invMb); }
 }
 
 void DetectCollison(){
-  for (int i{0}; i < MAX_ENTITIES; i++){
-  players[i]->resetFlags();
-    if (!players[i]) {
-      continue;
-    }
+  // Reset per-frame flags then detect & resolve collisions between active players.
+  // Only valid (non-null) pointers are considered.
+  for (int i = 0; i < MAX_ENTITIES; ++i) {
+    if (players[i]) players[i]->resetFlags();
+  }
+
+  // Then check collisions between valid player pointers only.
+  for (int i = 0; i < MAX_ENTITIES; ++i) {
+    if (!players[i]) continue;
     Vector2 center1 = {static_cast<float>(players[i]->get_x()), static_cast<float>(players[i]->get_y())};
-    for (int j{i+1}; j < MAX_ENTITIES; j++){
-      players[j]->resetFlags();
+    for (int j = i + 1; j < MAX_ENTITIES; ++j) {
       if (!players[j]) continue;
       Vector2 center2 = {static_cast<float>(players[j]->get_x()), static_cast<float>(players[j]->get_y())};
       if (CheckCollisionCircles(center1, static_cast<float>(players[i]->get_radius()), center2, static_cast<float>(players[j]->get_radius()))) {
@@ -147,15 +227,19 @@ void updatePlayerProperties(){
 
 int main() {
   // Initialize window, spawn entities and run simulation loop at fixed target FPS.
-  InitWindow(WIDTH, HEIGHT, "Basic Physics Simulation");
+  InitWindow(width, height, "Basic Physics Simulation");
+  SetWindowState(FLAG_WINDOW_RESIZABLE);
+  SetExitKey(KEY_NULL); // disable default ESC exit to allow in-game key handling
   initializePlayers();
   players[0]->setCanMove(true);
+  players[0]->set_color(GREEN);
+  players[0]->setEntityBouncy(false);
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
     updatePlayerProperties();
     DetectCollison();
     BeginDrawing();
-    DrawFPS(820,0);
+    DrawFPS(width - 100, 10);
     if (players[0]) {
       players[0]->showInfo();
     }

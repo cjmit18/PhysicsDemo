@@ -1,3 +1,6 @@
+// inputManager implementation: converts keyboard state into per-entity velocity updates.
+// Notes: uses dt = GetFrameTime(); WALK_SPEED/FLYSPEED treated as per-second accelerations/impulses.
+
 #include "Entity.h"
 #include "raylib.h"
 #include "inputManager.h"
@@ -7,6 +10,14 @@
 #include <algorithm>
 
 void inputManager::addToEntityList(Entity *entity){
+    if (std::find(entity_ptr.begin(), entity_ptr.end(), entity) != entity_ptr.end()) {
+        return; // already in list
+    }
+    if (auto it = std::find(entity_ptr.begin(), entity_ptr.end(), nullptr); it != entity_ptr.end()) {
+        *it = entity; // added in empty slot
+        return;
+    }
+    // If we reach here, no empty slot was found; add to the end
     entity_ptr.push_back(entity);
 }
 void inputManager::removeFromEntityList(Entity *entity) {
@@ -18,8 +29,7 @@ void inputManager::processInputs(){
         if (!entity) continue;
         if (!entity->getCanMove()) continue;
 
-        // Handle input as forces/accelerations (units: pixels/s^2) and apply using dt
-        // Horizontal movement: treat WALK_SPEED as acceleration; clamp to MAX_WALK_SPEED
+        // Horizontal: apply acceleration scaled by 1/mass and clamped to MAX_WALK_SPEED.
         if (IsKeyDown(KEY_A) && IsKeyDown(KEY_D)) {
             entity->set_vx(0.0);
         }
@@ -56,6 +66,7 @@ void inputManager::processInputs(){
                 entity->set_vy(MAX_FALL_SPEED);
             }
         }
+        // Jumping: instant velocity impulse for simplicity (FLYSPEED interpreted as initial jump speed).
         if (IsKeyPressed(KEY_SPACE)) {
             if (entity->getOnGround()) {
                 double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
@@ -63,9 +74,8 @@ void inputManager::processInputs(){
                 entity->setOnGround(false);
             }
         }
-        // When the entity can move but no horizontal keys are pressed, apply damping
+        // When no horizontal input, apply damping using same friction semantics as physicsEffects.
         if (entity->getCanMove() && !(IsKeyDown(KEY_D) || IsKeyDown(KEY_A))) {
-            // Use same FRICTION semantics as physicsEffects: per-second retention -> per-frame decay = FRICTION^dt
             double decay = std::pow(static_cast<double>(FRICTION), static_cast<double>(dt));
             entity->set_vx(entity->get_vx() * decay);
              if (std::abs(entity->get_vx()) < 0.05){
@@ -87,7 +97,44 @@ void inputManager::processInputs(){
         else {
             entity->setStatic(false);
         }
+        if (IsKeyPressed(KEY_B)) {
+            entity->setEntityBouncy(!entity->getEntityBouncy());
+        }
+        if (IsKeyPressed(KEY_F)) {
+            // Toggle fullscreen OR toggle borderless windowed mode (separately)
+            static bool borderless = false;
+            // Toggle fullscreen first if desired (uncomment if you want fullscreen toggle)
+            // ToggleFullscreen();
 
+            // Toggle borderless windowed mode without forcing it every frame
+            borderless = !borderless;
+            if (borderless) {
+                SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+            } else {
+                ClearWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+            }
+        }
+        if (IsKeyPressed(KEY_V)) {
+            int width[] = {1280,1920,2560,3840};
+            int height[] = {720,1080,1440,2160};
+            int monW = GetMonitorWidth(GetCurrentMonitor());
+            int monH = GetMonitorHeight(GetCurrentMonitor());
+            for (size_t i = 0; i < 4; ++i) {
+                if (GetScreenWidth() == width[i] && GetScreenHeight() == height[i]) {
+                    int newIndex = (i + 1) % 4;
+                    // Only change if the next resolution fits the current monitor
+                    if (width[newIndex] <= monW && height[newIndex] <= monH) {
+                        SetWindowSize(width[newIndex], height[newIndex]);
+                    }
+                    if (newIndex == 0 && (monW < width[0] || monH < height[0])) {
+                        // If even the smallest resolution doesn't fit, set to monitor size
+                        SetWindowSize(monW, monH);
+                    }
+                    break;
+                }
+            }
+        }
+     
     }
 
 }

@@ -1,41 +1,47 @@
-# Physics Demo — Bug Summary and Quick Fix Guide
+# Physics Demo — Overview & Quick Fix Guide
 
-This short README lists the most important issues found in the project and clear, prioritized fixes to make the physics stable and maintainable.
+A minimal 2D circular-entity physics demo using raylib. This document summarizes how to run the project, the most important issues observed, prioritized fixes to improve stability, and a short verification checklist.
 
-## Key Problems (short)
-- **Time/units mismatch:** Inputs apply `SPEED_MULT` to velocities while physics integration multiplies by `dt * SPEED_MULT`. This mixes units and breaks clamping. See `inputManager.cpp` and `physicsEffects.cpp`.
-- **Clamping mismatch:** `WALK_SPEED` and `MAX_WALK_SPEED` use different scales; clamping doesn't reliably limit speed. See `config.h` and `inputManager.cpp`.
-- **Friction formula:** Using `std::pow(FRICTION, dt * SPEED_MULT)` mixes frame-rate scaling into the exponent; this causes unstable damping.
-- **Memory & ownership:** Entities are stored as raw pointers and `players` is pre-sized to `MAX_ENTITIES` — this can lead to null slots, leaks, and double-registrations.
-- **Collision edge-case:** When two entity centers overlap (distance == 0) resolution can divide by zero or apply incorrect corrections.
-- **Duplicate registration:** `addToEntityList` pushes pointers without checking for duplicates.
+## Quick start
+- Requirements: C++17, raylib.
+- Build: use your usual build system (e.g., CMake or a simple g++ command).
+- Run: launch the produced executable; window is resizable and controlled by keyboard.
 
-## Priority Fixes (do these first)
-1. Normalize units and integration
-	- Store velocities as units/second. Remove `SPEED_MULT` from input velocity assignments.
-	- Integrate positions using `position += velocity * dt` (apply `dt` once).
-	- Files to edit: `inputManager.cpp`, `physicsEffects.cpp`, `config.h`.
+## What this project does
+Simulates simple circular entities with:
+- gravity, bounce and friction
+- basic collision resolution (position correction + impulse)
+- per-entity input control (move, jump, toggle bouncy/static)
 
-2. Fix friction damping
-	- Use `std::pow(FRICTION, dt)` or `exp(-k * dt)`; do not multiply `dt` by `SPEED_MULT`.
+## Key problems (high level)
+- Raw pointer ownership and pre-sized player pool cause null slots, leaks, and duplicated registrations.
+- Collision edge-case when centers overlap (distance == 0) can produce NaNs or unstable corrections.
+- Inconsistent units and friction semantics cause frame-rate dependent behaviour.
+- Duplicate registration into manager lists can cause redundant work and stale pointers.
 
-3. Unify speed constants
-	- Ensure `WALK_SPEED` and `MAX_WALK_SPEED` are both per-second values (or both scaled). Adjust values and clamps.
+## Priority fixes (apply in order)
+1. Stabilize integration and units
+   - Ensure velocities are pixels/second and integrate with position += velocity * dt.
+   - Verify WALK/FLY/FALL speeds and MAX_* clamps are consistent per-second values.
+2. Fix friction and damping
+   - Use per-frame decay derived from a per-second retention (e.g., pow(FRICTION, dt) or exp(-k*dt)).
+3. Collision safety
+   - Handle zero-distance by using relative-velocity fallback or deterministic jitter; clamp positional correction per-step.
+4. Ownership & registration
+   - Prevent duplicate registrations (check before push_back).
+   - Consider using unique_ptr for players or clearly document ownership and ensure single responsible owner.
+5. Clean-up and deletion
+   - Remove entities from all managers before delete; prefer marking-for-deletion then cleaning in a single place.
 
-4. Add collision safety
-	- If distance == 0, apply a small separation vector (e.g., jitter) or skip positional impulse. Respect static flags.
+## Verification checklist
+- Movement is smooth at different frame rates (run at 30/60/144 FPS).
+- No NaNs or crashes when entities spawn at same position.
+- Entities do not become permanently stuck in walls or floor.
+- Memory usage stable when spawning/deleting entities repeatedly.
 
-## Lower-priority improvements
-- Replace raw `Entity*` with `std::unique_ptr<Entity>` (or clearly state ownership). Convert `players` to an owning `vector`.
-- Prevent duplicate registration in `addToEntityList` (check `std::find` before `push_back`).
-- Normalize filename/include casing across the repo (ensure `#include` matches actual filenames).
+## Recommended next steps
+- Implement items 1–3 in a focused PR and run automated playtests.
+- Optional: migrate players container to owning smart pointers and ensure managers hold non-owning raw pointers or weak references.
+- Add unit tests for collision resolve (including zero-distance case) and for per-frame friction behaviour.
 
-## Quick verification checklist
-- Run the game and confirm movement is smooth and max-speed clamps work.
-- Confirm friction behaviour is consistent across frame rates.
-
-## Next steps I can take
-- Implement the top 3 fixes in a focused PR (units, friction, clamping).
-- Convert entity ownership to `unique_ptr` and update registration functions.
-
-Generated on 2026-01-31.
+Generated: 2026-01-31
