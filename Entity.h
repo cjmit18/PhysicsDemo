@@ -21,12 +21,16 @@ class Entity{
     double radius{0.0};
     double vx{0.0};
     double vy{0.0};
+    double weight{0.0};
     bool isColliding{false};
     bool isStatic{false};
     bool isOnGround{false};
     bool isAtCeiling{false};
+    bool isAtLeft{false};
+    bool isAtRight{false};
     bool markedForDeletion{false};
     bool canMove{false};
+    bool isBouncy{true};
     
     public:
     Entity() = default;
@@ -37,9 +41,10 @@ class Entity{
      * @param y Initial Y position
      * @param z Unused Z coordinate (reserved)
      * @param r Radius (also used as mass proxy)
+     * @param weight Weight (mass)
      * @param c Draw color
      */
-    Entity(const std::string &name, double x, double y, double z, double r, Color c);
+    Entity(const std::string &name, double x, double y, double z, double r, double weight, Color c);
 
     // Accessors and mutators
     std::string get_name() const;
@@ -56,6 +61,8 @@ class Entity{
     void set_vy(double vy);
     void set_color(Color color);
     Color get_color() const;
+    void setWeight(double weight);
+    double getWeight() const;
     void setCanMove(bool status);
     bool getCanMove() const;
     void addToVx(double dvx);
@@ -73,8 +80,18 @@ class Entity{
     bool getAtCeiling() const;
     void setOnGround(bool status);
     void setAtCeiling(bool status);
+    void setAtLeft(bool status);
+    bool getAtLeft() const;
+    bool getAtRight() const;
+    void setAtRight(bool status);
     void markedForDeletionStatus(bool status);
     bool isMarkedForDeletion() const;
     void resetFlags(); ///< reset collision and state flags each frame
+    bool isEntityBouncy() const;
+    void setEntityBouncy(bool status);
+    void setStatic(bool status);
+    bool getEntityStatic() const;
+    void setIsbouncing(bool status);
+    bool getIsbouncing() const;
 };
 #endif // Entity_H

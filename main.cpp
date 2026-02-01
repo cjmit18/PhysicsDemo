@@ -2,7 +2,7 @@
 #include "Entity.h"
 #include "physicsEffects.h"
 #include "inputManager.h"
-#include "windowInteractionss.h"
+#include "windowInteractions.h"
 #include "config.h"
 #include <ctime>
 #include <cmath>
@@ -13,7 +13,7 @@ double y = HEIGHT/2;
 
 // Pre-size the players vector to avoid out-of-bounds access on startup
 std::vector<Entity*> players(MAX_ENTITIES);
-PhysicsEffects physics;
+physicsEffects physics;
 inputManager inputMgr;
 windowInteractions windowInt;
 
@@ -23,11 +23,11 @@ void initializePlayers(){
   SetRandomSeed(time(NULL));
   for (int i{0}; i < MAX_ENTITIES; i++){
     players[i] = new Entity(("player "+ std::to_string(i+1)).c_str(),
-                            GetRandomValue(50, WIDTH-50),
-                            GetRandomValue(50, HEIGHT-50),
-                            0, 5, RED);
-    //players[i]->set_vx(GetRandomValue(-20,20));
-    //players[i]->set_vy(GetRandomValue(-20,20));
+                            WIDTH/2 + GetRandomValue(-100,100),
+                            HEIGHT/2 + GetRandomValue(-100,100),
+                            0, GetRandomValue(1,5), GetRandomValue(1,100), RED);
+    players[i]->set_vx(GetRandomValue(-20,20));
+    players[i]->set_vy(GetRandomValue(-20,20));
     physics.addToEntityList(players[i]);
     inputMgr.addToEntityList(players[i]);
     windowInt.addToEntityList(players[i]);
@@ -58,9 +58,11 @@ static void resolveCollision(Entity *a, Entity *b) {
   double nx = dx / dist; // normalized delta x
   double ny = dy / dist; // normalized delta y
 
-  // Use radius as proxy for mass
-  double ma = std::max(1.0, a->get_radius()); // mass of a
-  double mb = std::max(1.0, b->get_radius()); // mass of b
+  // Use `weight` as mass if available; fall back to radius as proxy.
+  double ma_raw = a->getWeight() > 0.0 ? a->getWeight() : a->get_radius();
+  double mb_raw = b->getWeight() > 0.0 ? b->getWeight() : b->get_radius();
+  double ma = std::max(1.0, ma_raw); // mass of a
+  double mb = std::max(1.0, mb_raw); // mass of b
   double total = ma + mb;
 
   // Separate proportional to mass
@@ -93,13 +95,36 @@ static void resolveCollision(Entity *a, Entity *b) {
   b->addToVy(-jy / mb); // was: b->set_vy(b->get_vy() - jy / mb);
 }
 
-void updatePlayerPositions(){
+void DetectCollison(){
+  for (int i{0}; i < MAX_ENTITIES; i++){
+  players[i]->resetFlags();
+    if (!players[i]) {
+      continue;
+    }
+    Vector2 center1 = {static_cast<float>(players[i]->get_x()), static_cast<float>(players[i]->get_y())};
+    for (int j{i+1}; j < MAX_ENTITIES; j++){
+      players[j]->resetFlags();
+      if (!players[j]) continue;
+      Vector2 center2 = {static_cast<float>(players[j]->get_x()), static_cast<float>(players[j]->get_y())};
+      if (CheckCollisionCircles(center1, static_cast<float>(players[i]->get_radius()), center2, static_cast<float>(players[j]->get_radius()))) {
+        players[i]->setColliding(true);
+        players[j]->setColliding(true);
+        resolveCollision(players[i], players[j]);
+      }
+    }
+  }
+}
+void updatePlayerProperties(){
   // Per-frame update:
   // 1) reset collision flags/colors
   // 2) apply input, physics and bounds per entity
-  // 3) detect pairwise circle collisions and resolve them
   // Entities flagged for deletion are cleaned up here.
-  // Reset colliding state and color each frame
+  // Reset colliding state and color each frame BEFORE processing input/physics
+  for (int i{0}; i < MAX_ENTITIES; i++){
+    if (!players[i]) {
+      continue;
+    }
+  }
   // Process inputs and physics once per frame (not per-entity)
   inputMgr.processInputs();
   physics.applyGravity();
@@ -117,16 +142,6 @@ void updatePlayerPositions(){
         players[i] = nullptr;
         continue;
     }
-    Vector2 center1 = {static_cast<float>(players[i]->get_x()), static_cast<float>(players[i]->get_y())};
-    for (int j{i+1}; j < MAX_ENTITIES; j++){
-      if (!players[j]) continue;
-      Vector2 center2 = {static_cast<float>(players[j]->get_x()), static_cast<float>(players[j]->get_y())};
-      if (CheckCollisionCircles(center1, static_cast<float>(players[i]->get_radius()), center2, static_cast<float>(players[j]->get_radius()))) {
-        players[i]->setColliding(true);
-        players[j]->setColliding(true);
-        resolveCollision(players[i], players[j]);
-      }
-    }
   }
 }
 
@@ -137,7 +152,8 @@ int main() {
   players[0]->setCanMove(true);
   SetTargetFPS(60);
   while (!WindowShouldClose()) {
-    updatePlayerPositions();
+    updatePlayerProperties();
+    DetectCollison();
     BeginDrawing();
     DrawFPS(820,0);
     if (players[0]) {

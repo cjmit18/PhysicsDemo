@@ -1,16 +1,16 @@
-#ifndef PhysicsEffects_h
-#define PhysicsEffects_h
+#ifndef physicsEffects_h
+#define physicsEffects_h
 #include "Entity.h"
 #include <vector>
 
-class PhysicsEffects {
+class physicsEffects {
     private:
     std::vector<Entity*> entity_ptr;
     public:
-    PhysicsEffects() = default;
+    physicsEffects() = default;
 
     void applyGravity();
     void addToEntityList(Entity *entity);
     void removeFromEntityList(Entity *entity);
 };
-#endif // PhysicsEffects_h
+#endif // physicsEffects_h

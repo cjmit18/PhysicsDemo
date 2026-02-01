@@ -1,5 +1,5 @@
-#ifndef windowInteractionss_h
-#define windowInteractionss_h
+#ifndef windowInteractions_h
+#define windowInteractions_h
 #include "Entity.h"
 #include <vector>
 

@@ -1,6 +1,5 @@
 #include "Entity.h"
 #include "raylib.h"
-#include "PhysicsEffects.h"
 #include "inputManager.h"
 #include "config.h"
 #include <vector>
@@ -18,39 +17,60 @@ void inputManager::processInputs(){
     for (Entity *entity : entity_ptr) {
         if (!entity) continue;
         if (!entity->getCanMove()) continue;
-        // Horizontal movement
-        // Set instantaneous horizontal velocity (don't multiply by dt)
-        if (IsKeyDown(KEY_D)) {
-            entity->set_vx(WALK_SPEED * SPEED_MULT);
+
+        // Handle input as forces/accelerations (units: pixels/s^2) and apply using dt
+        // Horizontal movement: treat WALK_SPEED as acceleration; clamp to MAX_WALK_SPEED
+        if (IsKeyDown(KEY_A) && IsKeyDown(KEY_D)) {
+            entity->set_vx(0.0);
+        }
+        else if (IsKeyDown(KEY_D)) {
+            double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
+            entity->addToVx((WALK_SPEED / mass) * dt);
             if (entity->get_vx() > MAX_WALK_SPEED) {
                 entity->set_vx(MAX_WALK_SPEED);
             }
-        } 
+        }
         else if (IsKeyDown(KEY_A)) {
-            entity->set_vx(-WALK_SPEED * SPEED_MULT);
+            double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
+            entity->addToVx((-WALK_SPEED / mass) * dt);
             if (entity->get_vx() < -MAX_WALK_SPEED) {
                 entity->set_vx(-MAX_WALK_SPEED);
             }
         }
-        // Vertical movement
-        if (IsKeyDown(KEY_W)) {
-            entity->addToVy(-FLYSPEED * dt * SPEED_MULT);
+
+        // Vertical movement: FLYSPEED/FALL_SPEED treated as accelerations (or forces that cancel mass)
+        if (IsKeyDown(KEY_W) && IsKeyDown(KEY_S)) {
+            // no vertical input; gravity handled in physicsEffects
+        }
+        else if (IsKeyDown(KEY_W)) {
+            double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
+            entity->addToVy((-FLYSPEED / mass) * dt);
             if (entity->get_vy() < -MAX_FLY_SPEED) {
                 entity->set_vy(-MAX_FLY_SPEED);
             }
         }
-        if (IsKeyDown(KEY_S)) {
-            entity->addToVy(FALL_SPEED * dt * SPEED_MULT);
+        else if (IsKeyDown(KEY_S)) {
+            double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
+            entity->addToVy((FALL_SPEED / mass) * dt);
             if (entity->get_vy() > MAX_FALL_SPEED) {
                 entity->set_vy(MAX_FALL_SPEED);
             }
         }
+        if (IsKeyPressed(KEY_SPACE)) {
+            if (entity->getOnGround()) {
+                double mass = entity->getWeight(); if (mass <= 0.0) mass = 1.0;
+                entity->set_vy(-FLYSPEED / mass); // instant jump impulse
+                entity->setOnGround(false);
+            }
+        }
         // When the entity can move but no horizontal keys are pressed, apply damping
         if (entity->getCanMove() && !(IsKeyDown(KEY_D) || IsKeyDown(KEY_A))) {
-            entity->set_vx(entity->get_vx() * 0.8);
-            if (std::abs(entity->get_vx()) < 0.05){
-                entity->set_vx(0.0);
-            }
+            // Use same FRICTION semantics as physicsEffects: per-second retention -> per-frame decay = FRICTION^dt
+            double decay = std::pow(static_cast<double>(FRICTION), static_cast<double>(dt));
+            entity->set_vx(entity->get_vx() * decay);
+             if (std::abs(entity->get_vx()) < 0.05){
+                 entity->set_vx(0.0);
+             }
         }
         if (IsKeyDown(KEY_EQUAL)) {
             entity->set_radius(entity->get_radius() + 1.0);
@@ -61,5 +81,13 @@ void inputManager::processInputs(){
         if (IsKeyDown(KEY_DELETE)) {
             entity->markedForDeletionStatus(true);
             }
+        if (!(IsKeyPressed(KEY_W) && IsKeyPressed(KEY_S) && IsKeyPressed(KEY_A) && IsKeyPressed(KEY_D))) {
+            entity->setStatic(true);
+        } 
+        else {
+            entity->setStatic(false);
+        }
+
     }
+
 }

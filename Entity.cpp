@@ -9,7 +9,7 @@
 // - FLYSPEED: instantaneous upward velocity when W is pressed.
 // - WALK_SPEED / MAX_WALK_SPEED: horizontal control responsiveness/clamp.
 
-Entity::Entity(const std::string &name, double x, double y, double z, double r, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), color(c) {}
+Entity::Entity(const std::string &name, double x, double y, double z, double r, double w, Color c) : name(name), x_pos(x), y_pos(y),z_pos(z), radius(r), weight(w), color(c) {}
 
 
 void Entity::showInfo(){
@@ -90,6 +90,18 @@ void Entity::setOnGround(bool status){
 bool Entity::getAtCeiling() const{
     return isAtCeiling;
 }
+bool Entity::getAtLeft() const{
+    return isAtLeft;
+}
+void Entity::setAtLeft(bool status){
+    isAtLeft = status;
+}
+bool Entity::getAtRight() const{
+    return isAtRight;
+}
+void Entity::setAtRight(bool status){
+    isAtRight = status;
+}
 void Entity::setAtCeiling(bool status){
     isAtCeiling = status;
 }
@@ -106,7 +118,34 @@ bool Entity::getCanMove() const {
     return canMove;
 }
 void Entity::resetFlags() {
-    isColliding = false;
-    isOnGround = false;
-    isAtCeiling = false;
+   setColliding(false);
+    setOnGround(false);
+    setAtCeiling(false);
+    setAtLeft(false);
+    setAtRight(false);
+    setStatic(false);
+}
+bool Entity::isEntityBouncy() const {
+    return isBouncy;
+}
+void Entity::setEntityBouncy(bool status) {
+    isBouncy = status;
+}
+void Entity::setWeight(double weight) {
+    this->weight = weight;
+}
+double Entity::getWeight() const {
+    return weight;
+}
+void Entity::setStatic(bool status) {
+    isStatic = status;
+}
+bool Entity::getEntityStatic() const {
+    return isStatic;
+}
+void Entity::setIsbouncing(bool status) {
+    isBouncy = status;
+}
+bool Entity::getIsbouncing() const {
+    return isBouncy;
 }

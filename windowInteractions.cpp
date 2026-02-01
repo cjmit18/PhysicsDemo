@@ -1,4 +1,4 @@
-#include "windowInteractionss.h"
+#include "windowInteractions.h"
 #include "raylib.h"
 #include "Entity.h"
 #include "config.h"
@@ -15,12 +15,11 @@ void windowInteractions::removeFromEntityList(Entity* e) {
 void windowInteractions::checkAllBounds() {
     for (auto& entity : entity_ptr) {
 
-        entity->set_color(RED);
-        entity->resetFlags();
-
         if (!entity) {
             continue;
         }
+
+        entity->set_color(RED);
 
         if (entity->get_radius() >= WIDTH/2.0 || entity->get_radius() >= HEIGHT/2.0) {
             entity->set_radius(std::min(WIDTH/2.0 , HEIGHT/2.0));
@@ -45,12 +44,12 @@ void windowInteractions::checkAllBounds() {
         // Check right boundary
         if (entity->get_x() + entity->get_radius() >= WIDTH) {
             entity->set_x(WIDTH - entity->get_radius());
-            entity->setColliding(true);
+            entity->setAtRight(true);
         }
         // Check left boundary
         if (entity->get_x() - entity->get_radius() <= 0) {
             entity->set_x(entity->get_radius());
-            entity->setColliding(true);
+            entity->setAtLeft(true);
         }
         if (entity->getCollided()) {
             entity->set_color(BLUE);
@@ -62,5 +61,9 @@ void windowInteractions::checkAllBounds() {
             entity->set_color(YELLOW);
             entity->set_vy(0.0); // stop upward movement
         }
-    }
+        if (entity->getAtLeft() || entity->getAtRight()) {
+            entity->set_color(PURPLE);
+            entity->set_vx(0.0); // stop horizontal movement
+        }
+}
 }
