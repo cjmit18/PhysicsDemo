@@ -9,6 +9,7 @@
                 "-g",
                 "${file}",
                 "Entity.cpp",
+                "commands.cpp",
                 "physicsEffects.cpp",
                 "inputManager.cpp",
                 "windowInteractions.cpp",

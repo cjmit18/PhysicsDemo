@@ -19,7 +19,8 @@ void Entity::showInfo(){
     // Draw textual debug info on screen (not console)
     DrawText(("Entity: " + this->get_name()).c_str(), 10, 10, 10, BLACK);
     DrawText(("Position: (" + std::to_string(this->get_x()) + ", " + std::to_string(this->get_y()) + ")").c_str(), 10, 25, 10, BLACK);
-    DrawText(("Velocity: (" + std::to_string(this->get_vx()) + ", " + std::to_string(this->get_vy()) + ")").c_str(), 10, 40, 10, BLACK);
+    DrawText(("Position + Radius: (" + std::to_string(this->get_x() + this->get_radius()) + ", " + std::to_string(this->get_y() + this->get_radius()) + ")").c_str(), 10, 40, 10, BLACK);
+    DrawText(("Velocity: (" + std::to_string(this->get_vx()) + ", " + std::to_string(this->get_vy()) + ")").c_str(), 10, 85, 10, BLACK);
     DrawText(("Radius: " + std::to_string(this->get_radius())).c_str(), 10, 55, 10, BLACK);
     DrawText(("Weight: " + std::to_string(this->getWeight())).c_str(), 10, 70, 10, BLACK);
 }

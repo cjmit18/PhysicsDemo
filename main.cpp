@@ -2,75 +2,21 @@
 // Key notes:
 //  - resolveCollision uses weight (or radius) as mass, clamps per-step positional correction, and avoids divide-by-zero by using deterministic jitter.
 //  - DetectCollison iterates valid pointers only and resets flags before collision pass.
-
 #include "raylib.h"
 #include "Entity.h"
 #include "physicsEffects.h"
 #include "inputManager.h"
 #include "windowInteractions.h"
+#include "commands.h"
 #include "config.h"
 #include <ctime>
 #include <cmath>
 #include <vector>
 
-double x = GetScreenWidth()/2;
-double y = GetScreenHeight()/2;
 int width = 2560;
-int height = 13f00;
+int height = 1300;
 
 // Pre-size the players vector to avoid out-of-bounds access on startup
-std::vector<Entity*> players(MAX_ENTITIES);
-physicsEffects physics;
-inputManager inputMgr;
-windowInteractions windowInt;
-
-void initializePlayers(){
-  // Create a pool of entities with randomized starting positions and small initial horizontal velocity.
-  // Names are generated for debug; color set to RED initially.
-  SetRandomSeed(time(NULL));
-  for (int i{0}; i < MAX_ENTITIES; i++){
-    Entity* player = new Entity("player "+ std::to_string(i+1),
-                            x + GetRandomValue(0,2560),
-                            y + GetRandomValue(0,2000),
-                            0, GetRandomValue(1,5), GetRandomValue(1,100), RED);
-    if (player == nullptr) {
-      continue;
-    }
-    if (players[i] == player) {
-      continue; // already assigned
-    }
-    players[i] = player;
-    players[i]->set_vx(GetRandomValue(-20,20));
-    players[i]->set_vy(GetRandomValue(-20,20));
-    physics.addToEntityList(players[i]);
-    inputMgr.addToEntityList(players[i]);
-    windowInt.addToEntityList(players[i]);
-  }
-}
-void SpawnEntity(double x, double y, double radius, double weight, Color color, int nEnts){
-  // Spawn a new entity at the specified position with given properties.
-  for (int i{0}; i < nEnts; i++){
-    if (players[i] != nullptr) {
-      continue;
-    }
-    Entity* newEntity = new Entity("player " + std::to_string(i+1), x, y, 0, radius, weight, color);
-    if (newEntity == nullptr) {
-      return; // allocation failed
-    }
-    players[i] = newEntity;
-    physics.addToEntityList(players[i]);
-    inputMgr.addToEntityList(players[i]);
-    windowInt.addToEntityList(players[i]);
-    return; // spawned successfully
-  }
-}
-void drawPlayers(){
-  // Draw each active entity as a circle using the entity's stored color and radius.
-  for (int i{0}; i < MAX_ENTITIES; i++){
-    if (!players[i]) continue;
-    DrawCircle(players[i]->get_x(), players[i]->get_y(), players[i]->get_radius(), players[i]->get_color());
-  }
-}
 
 static void resolveCollision(Entity *a, Entity *b) {
   // Resolve interpenetration by moving objects proportionally to their "mass" (radius).
@@ -171,7 +117,6 @@ static void resolveCollision(Entity *a, Entity *b) {
   if (!a->getEntityStatic()) { a->addToVx(jx * invMa); a->addToVy(jy * invMa); }
   if (!b->getEntityStatic()) { b->addToVx(-jx * invMb); b->addToVy(-jy * invMb); }
 }
-
 void DetectCollison(){
   // Reset per-frame flags then detect & resolve collisions between active players.
   // Only valid (non-null) pointers are considered.
@@ -186,6 +131,12 @@ void DetectCollison(){
     for (int j = i + 1; j < MAX_ENTITIES; ++j) {
       if (!players[j]) continue;
       Vector2 center2 = {static_cast<float>(players[j]->get_x()), static_cast<float>(players[j]->get_y())};
+      if (players[i]->get_x() + players[i]->get_radius() < players[j]->get_x() - players[j]->get_radius() ||
+          players[i]->get_x() - players[i]->get_radius() > players[j]->get_x() + players[j]->get_radius() ||
+          players[i]->get_y() + players[i]->get_radius() < players[j]->get_y() - players[j]->get_radius() ||
+          players[i]->get_y() - players[i]->get_radius() > players[j]->get_y() + players[j]->get_radius()) {
+        continue; // skip if bounding boxes do not overlap
+      }
       if (CheckCollisionCircles(center1, static_cast<float>(players[i]->get_radius()), center2, static_cast<float>(players[j]->get_radius()))) {
         players[i]->setColliding(true);
         players[j]->setColliding(true);
@@ -229,8 +180,10 @@ int main() {
   // Initialize window, spawn entities and run simulation loop at fixed target FPS.
   InitWindow(width, height, "Basic Physics Simulation");
   SetWindowState(FLAG_WINDOW_RESIZABLE);
+  
   SetExitKey(KEY_NULL); // disable default ESC exit to allow in-game key handling
-  initializePlayers();
+  //initializePlayers();
+  initializePlayers(); // allocate players[] before dereferencing players[0]
   players[0]->setCanMove(true);
   players[0]->set_color(GREEN);
   players[0]->setEntityBouncy(false);

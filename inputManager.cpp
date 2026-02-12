@@ -5,9 +5,11 @@
 #include "raylib.h"
 #include "inputManager.h"
 #include "config.h"
+#include "commands.h"
 #include <vector>
 #include <cmath> // added for std::abs
 #include <algorithm>
+
 
 void inputManager::addToEntityList(Entity *entity){
     if (std::find(entity_ptr.begin(), entity_ptr.end(), entity) != entity_ptr.end()) {
@@ -25,7 +27,10 @@ void inputManager::removeFromEntityList(Entity *entity) {
 }
 void inputManager::processInputs(){
     float dt = GetFrameTime();
-    for (Entity *entity : entity_ptr) {
+    // Iterate over a snapshot to avoid iterator invalidation if `SpawnEntity`
+    // or other calls modify `entity_ptr` during processing.
+    std::vector<Entity*> snapshot = entity_ptr;
+    for (Entity *entity : snapshot) {
         if (!entity) continue;
         if (!entity->getCanMove()) continue;
 
@@ -134,7 +139,9 @@ void inputManager::processInputs(){
                 }
             }
         }
-     
+        if ((IsKeyPressed(KEY_B))) {
+            SpawnEntity(entity->get_x() + 50, entity->get_y() + 50, entity->get_radius(), entity->getWeight(), entity->get_color(), 1);
+        }
     }
 
 }

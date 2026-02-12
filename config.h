@@ -4,6 +4,7 @@
 #include "raylib.h"
 
 #define MAX_ENTITIES 1000
+#define INITIAL_ENTITIES 500
 #define SPEED_MULT 1.0
 
 #define GRAVITY 10 // pixels per second squared
